@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Point on Slope Check</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        #graph {
+            background: #fafafa;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+        }
+        #question-box {
+            margin-bottom: 20px;
+        }
+        #solution {
+            margin-top: 20px;
+            font-size: 1.1em;
+            background: #e8f5e9;
+            border-radius: 6px;
+            padding: 10px;
+            border: 1px solid #b2dfdb;
+        }
+        #next-btn {
+            margin-top: 15px;
+            padding: 8px 16px;
+            font-size: 1em;
+            border-radius: 4px;
+            border: none;
+            background: #1976d2;
+            color: #fff;
+            cursor: pointer;
+        }
+        #next-btn:hover {
+            background: #1565c0;
+        }
+        #show-slope {
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Point on Slope Check</h1>
+        <div id="score">Score: 0</div>
+        <canvas id="graph" width="500" height="500"></canvas>
+        <div id="question-box">
+            <label><input type="checkbox" id="show-slope"> Show line equation</label>
+            <p id="question">Is this point on the sloped line?</p>
+            <button id="yes-btn">Yes</button>
+            <button id="no-btn">No</button>
+        </div>
+        <div id="solution" style="display:none;"></div>
+        <button id="next-btn" style="display:none;">Next</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('graph');
+        const ctx = canvas.getContext('2d');
+        const scoreDiv = document.getElementById('score');
+        const questionBox = document.getElementById('question-box');
+        const solutionDiv = document.getElementById('solution');
+        const nextBtn = document.getElementById('next-btn');
+        const yesBtn = document.getElementById('yes-btn');
+        const noBtn = document.getElementById('no-btn');
+        const showSlopeCheckbox = document.getElementById('show-slope');
+        let score = 0;
+        let current;
+
+        function randomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function randomSlope() {
+            // Slope is ±(1/8), ±(2/8), ..., ±(8/8) = ±1, ±2, ..., ±8
+            let numerator = randomInt(1, 8);
+            let denominator = 8;
+            let sign = Math.random() < 0.5 ? 1 : -1;
+            let slope = sign * numerator / denominator;
+            return { slope, numerator: sign * numerator, denominator };
+        }
+
+        function generateProblem() {
+            // Slope and intercept
+            let slopeObj = randomSlope();
+            let m = slopeObj.slope;
+            let mNum = slopeObj.numerator;
+            let mDen = slopeObj.denominator;
+            let b = randomInt(-5, 5);
+            // Random integer x for point
+            let x = randomInt(-9, 9);
+            // 50/50 chance to generate a point on or off the line
+            let y;
+            if (Math.random() < 0.5) {
+                y = Math.round(m * x + b); // integer y, guaranteed on line
+            } else {
+                // Pick a y not on the line
+                let delta = randomInt(1, 4);
+                if (Math.random() < 0.5) delta *= -1;
+                y = Math.round(m * x + b + delta); // integer y, not on line
+            }
+            // Clamp x and y to -10..10
+            let clampedX = Math.max(-10, Math.min(10, x));
+            let clampedY = Math.max(-10, Math.min(10, y));
+            // Calculate if the point is mathematically on the line
+            let isOnLine = (clampedY === Math.round(m * clampedX + b));
+            return { m, mNum, mDen, b, x: clampedX, y: clampedY, onLine: isOnLine };
+        }
+
+        function drawGraph(m, b, x, y) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Draw grid
+            ctx.strokeStyle = '#ddd';
+            for (let i = -10; i <= 10; i++) {
+                // Vertical
+                let px = toCanvasX(i);
+                ctx.beginPath();
+                ctx.moveTo(px, toCanvasY(-10));
+                ctx.lineTo(px, toCanvasY(10));
+                ctx.stroke();
+                // Horizontal
+                let py = toCanvasY(i);
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(-10), py);
+                ctx.lineTo(toCanvasX(10), py);
+                ctx.stroke();
+            }
+            // Axes
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+            // x-axis
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(-10), toCanvasY(0));
+            ctx.lineTo(toCanvasX(10), toCanvasY(0));
+            ctx.stroke();
+            // y-axis
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(0), toCanvasY(-10));
+            ctx.lineTo(toCanvasX(0), toCanvasY(10));
+            ctx.stroke();
+            ctx.lineWidth = 1;
+            // Draw line
+            ctx.strokeStyle = '#1976d2';
+            ctx.beginPath();
+            let y1 = m * -10 + b;
+            let y2 = m * 10 + b;
+            ctx.moveTo(toCanvasX(-10), toCanvasY(y1));
+            ctx.lineTo(toCanvasX(10), toCanvasY(y2));
+            ctx.stroke();
+            // Draw point only if x and y are not null
+            if (x !== null && y !== null) {
+                ctx.fillStyle = '#d32f2f';
+                ctx.beginPath();
+                ctx.arc(toCanvasX(x), toCanvasY(y), 7, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+
+        function toCanvasX(x) {
+            // Map -10..10 to 0..500
+            return ((x + 10) / 20) * canvas.width;
+        }
+        function toCanvasY(y) {
+            // Map -10..10 to 500..0
+            return canvas.height - ((y + 10) / 20) * canvas.height;
+        }
+
+        function showSolution(problem, userCorrect) {
+            // Reveal the point on the graph after answering
+            drawGraph(problem.m, problem.b, problem.x, problem.y);
+            let expectedY = Math.round(problem.m * problem.x + problem.b);
+            let solutionText = `y = mx + b`;
+            let slopeStr = (problem.mDen === 8 && Math.abs(problem.mNum) !== 8)
+                ? `${problem.mNum}/${problem.mDen}`
+                : `${problem.mNum / problem.mDen}`;
+            if (problem.mNum < 0) slopeStr = `-${Math.abs(problem.mNum)}/${problem.mDen}`;
+            solutionText += `<br>y = (${slopeStr}) × ${problem.x} + ${problem.b}`;
+            solutionText += `<br>y = ${expectedY}`;
+            solutionText += `<br>Point: (${problem.x}, ${problem.y})`;
+            if (problem.y === expectedY) {
+                solutionText += `<br>Since y = ${problem.y}, the point is on the line.`;
+            } else {
+                solutionText += `<br>Since y ≠ ${expectedY}, the point is not on the line.`;
+            }
+            solutionDiv.innerHTML = `Correct answer: <b>${problem.y === expectedY ? 'Yes' : 'No'}</b><br><br>${solutionText}`;
+            solutionDiv.style.display = 'block';
+            nextBtn.style.display = 'inline-block';
+            questionBox.style.display = 'none';
+            if (userCorrect) {
+                score++;
+                scoreDiv.textContent = `Score: ${score}`;
+            }
+        }
+
+        function nextProblem() {
+            current = generateProblem();
+            // Draw graph without the point
+            drawGraph(current.m, current.b, null, null);
+            // Show point coordinates in question box, optionally show line equation
+            const showSlope = showSlopeCheckbox.checked;
+            let slopeStr = (current.mDen === 8 && Math.abs(current.mNum) !== 8)
+                ? `${current.mNum}/${current.mDen}`
+                : `${current.mNum / current.mDen}`;
+            if (current.mNum < 0) slopeStr = `-${Math.abs(current.mNum)}/${current.mDen}`;
+            if (showSlope) {
+                document.getElementById('question').innerHTML = `Line: <b>y = ${slopeStr}x + ${current.b}</b><br>Is the point (<b>${current.x}, ${current.y}</b>) on this line?`;
+            } else {
+                document.getElementById('question').innerHTML = `Is the point (<b>${current.x}, ${current.y}</b>) on the sloped line?`;
+            }
+            solutionDiv.style.display = 'none';
+            nextBtn.style.display = 'none';
+            questionBox.style.display = 'block';
+        }
+
+        yesBtn.onclick = () => {
+            let expectedY = Math.round(current.m * current.x + current.b);
+            showSolution(current, current.y === expectedY);
+        };
+        noBtn.onclick = () => {
+            let expectedY = Math.round(current.m * current.x + current.b);
+            showSolution(current, current.y !== expectedY);
+        };
+        nextBtn.onclick = nextProblem;
+        showSlopeCheckbox.onchange = function() {
+            // Only update the question text, do not generate a new problem
+            if (!current) return;
+            let slopeStr = (current.mDen === 8 && Math.abs(current.mNum) !== 8)
+                ? `${current.mNum}/${current.mDen}`
+                : `${current.mNum / current.mDen}`;
+            if (current.mNum < 0) slopeStr = `-${Math.abs(current.mNum)}/${current.mDen}`;
+            if (showSlopeCheckbox.checked) {
+                document.getElementById('question').innerHTML = `Line: <b>y = ${slopeStr}x + ${current.b}</b><br>Is the point (<b>${current.x}, ${current.y}</b>) on this line?`;
+            } else {
+                document.getElementById('question').innerHTML = `Is the point (<b>${current.x}, ${current.y}</b>) on the sloped line?`;
+            }
+        };
+        // Initial load
+        nextProblem();
+    </script>
+</body>
+</html>
